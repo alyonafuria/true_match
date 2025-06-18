@@ -87,11 +87,17 @@ router.get('/linkedin/callback', async (req: Request, res: Response): Promise<vo
     const userData = userInfoRes.data;
     console.log('User data received:', userData);
 
-    // 3. Return minimal user data needed for ICP Internet Identity
-    res.json({
-      id: userData.sub,        // Unique LinkedIn user ID
-      email: userData.email    // User's verified email address
-    });
+    // 3. Redirect back to frontend with success and user data
+    const frontendUrl = new URL('http://localhost:9002/auth/callback');
+    frontendUrl.searchParams.append('status', 'success');
+    frontendUrl.searchParams.append('user', JSON.stringify({
+      id: userData.sub,
+      name: userData.name,
+      email: userData.email,
+      picture: userData.picture
+    }));
+    
+    res.redirect(frontendUrl.toString());
 
   } catch (error: any) {
     console.error('Auth error:', {
@@ -105,12 +111,14 @@ router.get('/linkedin/callback', async (req: Request, res: Response): Promise<vo
       stack: error.stack
     });
     
-    const status = error.response?.status || 500;
-    const message = error.response?.data?.error_description || 'Authentication failed';
-    res.status(status).json({ 
-      error: error.response?.data?.error || 'auth_error',
-      error_description: message
-    });
+    // Redirect to frontend with error
+    const frontendUrl = new URL('http://localhost:9002/auth/callback');
+    frontendUrl.searchParams.append('status', 'error');
+    frontendUrl.searchParams.append('error', error.response?.data?.error || 'auth_error');
+    frontendUrl.searchParams.append('error_description', 
+      error.response?.data?.error_description || 'Authentication failed');
+    
+    res.redirect(frontendUrl.toString());
   }
 });
 
