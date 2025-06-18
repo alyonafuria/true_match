@@ -20,12 +20,36 @@ export function UserDashboard() {
   if (userProfile.parsedInfo?.education && userProfile.parsedInfo.education.length > 0) profileCompletion += 20;
   if (userProfile.skills && userProfile.skills.length > 0) profileCompletion += 20;
   
-  // Get user email from localStorage
+  // Get user data from localStorage
   const userEmail = typeof window !== 'undefined' ? localStorage.getItem('userEmail') : null;
+  const userName = typeof window !== 'undefined' ? localStorage.getItem('userName') : null;
+  const iiPrincipal = typeof window !== 'undefined' ? localStorage.getItem('iiPrincipal') : null;
+
+  // Function to shorten the principal for display
+  const formatPrincipal = (principal: string | null) => {
+    if (!principal) return 'Not connected';
+    return `${principal.slice(0, 5)}...${principal.slice(-3)}`;
+  };
 
   return (
     <div className="space-y-6 animate-fadeIn">
-      <h1 className="text-3xl font-bold font-headline">Welcome back, {userEmail || 'User'}!</h1>
+      <div className="flex flex-col space-y-2">
+        <h1 className="text-3xl font-bold font-headline">
+          Welcome back, {userName || userEmail?.split('@')[0] || 'User'}!
+        </h1>
+        {iiPrincipal && (
+          <div className="text-sm text-muted-foreground flex items-center gap-2">
+            <span className="font-mono bg-accent/20 px-2 py-1 rounded">
+              ICP: {formatPrincipal(iiPrincipal)}
+            </span>
+            {userEmail && (
+              <span className="text-muted-foreground/80">
+                {userEmail}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
       
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card className="shadow-lg hover:shadow-xl transition-shadow duration-300 animate-slideInUp">
