@@ -87,15 +87,20 @@ router.get('/linkedin/callback', async (req: Request, res: Response): Promise<vo
     const userData = userInfoRes.data;
     console.log('User data received:', userData);
 
-    // 3. Redirect back to frontend with success and user data
-    const frontendUrl = new URL('http://localhost:9002/auth/callback');
-    frontendUrl.searchParams.append('status', 'success');
-    frontendUrl.searchParams.append('user', JSON.stringify({
+    // 3. Format user data from LinkedIn response
+    const userInfo = {
       id: userData.sub,
-      name: userData.name,
+      name: userData.name || `${userData.given_name || ''} ${userData.family_name || ''}`.trim() || null,
       email: userData.email,
       picture: userData.picture
-    }));
+    };
+    
+    console.log('Sending user data to frontend:', userInfo);
+    
+    // 4. Redirect back to frontend with success and user data
+    const frontendUrl = new URL('http://localhost:9002/auth/callback');
+    frontendUrl.searchParams.append('status', 'success');
+    frontendUrl.searchParams.append('user', JSON.stringify(userInfo));
     
     res.redirect(frontendUrl.toString());
 
