@@ -1,4 +1,5 @@
 export interface LinkedInUser {
+  id: string;
   sub: string;
   email: string;
   name?: string;

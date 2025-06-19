@@ -100,8 +100,11 @@ router.get('/linkedin/callback', async (req: Request, res: Response): Promise<vo
     // 4. Redirect back to frontend with success and user data
     const frontendUrl = new URL('http://localhost:9002/auth/callback');
     frontendUrl.searchParams.append('status', 'success');
-    frontendUrl.searchParams.append('user', JSON.stringify(userInfo));
+    // Encode the user data to safely include it in the URL
+    const encodedUserData = encodeURIComponent(JSON.stringify(userInfo));
+    frontendUrl.searchParams.append('user', encodedUserData);
     
+    console.log('Redirecting to frontend with URL:', frontendUrl.toString());
     res.redirect(frontendUrl.toString());
 
   } catch (error: any) {

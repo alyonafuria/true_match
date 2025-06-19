@@ -22,6 +22,10 @@
     "verifications_canister": {
       "main": "src/verifications_canister/main.mo",
       "type": "motoko"
+    },
+    "ii_app_backend": {
+      "main": "src/ii_app_backend/main.mo",
+      "type": "motoko"
     }
   },
   "defaults": {

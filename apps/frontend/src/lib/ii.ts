@@ -70,8 +70,18 @@ export async function loginWithII(
     // Check if we need to authenticate
     if (!(await authClient.isAuthenticated())) {
       // If not authenticated, trigger the II flow with redirect
+      // Get the Internet Identity URL from environment variables
+      const iiCanisterId = process.env.NEXT_PUBLIC_II_CANISTER_ID || 'rdmx6-jaaaa-aaaaa-aaadq-cai';
+      const isLocalDevelopment = process.env.NODE_ENV === 'development' && !process.env.NEXT_PUBLIC_IC_HOST;
+      
+      const identityProvider = isLocalDevelopment 
+        ? `http://${iiCanisterId}.localhost:4943`
+        : 'https://identity.ic0.app';
+      
+      console.log('Using Internet Identity provider:', identityProvider);
+      
       await authClient.login({
-        identityProvider: "http://uxrrr-q7777-77774-qaaaq-cai.localhost:4943/", // Updated to use the deployed II canister
+        identityProvider,
         onSuccess: () => {
           const principal = authClient.getIdentity().getPrincipal().toString();
           console.log("✅ II login successful with principal:", principal);
