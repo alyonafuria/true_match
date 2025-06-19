@@ -1,20 +1,14 @@
 import { Router, Request, Response, RequestHandler } from 'express';
 import OpenAI from 'openai';
-import dotenv from 'dotenv';
-
-// IC Agent imports are commented out until we set up the canister
-// import { Actor, HttpAgent } from '@dfinity/agent';
-// import { idlFactory as claimsIdl } from '../../canisters/claims_canister/claims_canister.did';
-// import { _SERVICE as ClaimsService } from '../../canisters/claims_canister/claims_canister.did';
+import { userService } from '../services/userService';
+import { Principal } from '@dfinity/principal';
 
 // Define the router
 export const cvRouter = Router();
 
-dotenv.config();
-
 // Initialize OpenAI client
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.OPENAI_API_KEY || '',
 });
 
 interface WorkExperience {
@@ -29,13 +23,19 @@ interface WorkExperience {
 const parseCvHandler: RequestHandler = async (req: Request, res: Response): Promise<void> => {
   try {
     const { text } = req.body;
+    const principal = (req as any).user?.principal;
 
     if (!text) {
       res.status(400).json({ error: 'No text provided' });
       return;
     }
 
-    // Call OpenAI to parse the CV text using the cost-effective GPT-4.1 nano model
+    if (!principal) {
+      res.status(401).json({ error: 'Authentication required' });
+      return;
+    }
+
+    // Call OpenAI to parse the CV text
     const prompt = `Extract work experience from this CV text and return a JSON array with the following structure for each job:
     [
       {
@@ -52,12 +52,12 @@ const parseCvHandler: RequestHandler = async (req: Request, res: Response): Prom
     Only return valid JSON, no other text.`;
 
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4.1-nano',
+      model: 'gpt-3.5-turbo',
       messages: [
         { role: 'system', content: 'You are a helpful assistant that extracts work experience from CV text in JSON format.' },
         { role: 'user', content: prompt }
       ],
-      max_tokens: 1000,
+      max_tokens: 1500,
       temperature: 0.2,
     });
 
@@ -76,23 +76,50 @@ const parseCvHandler: RequestHandler = async (req: Request, res: Response): Prom
       throw new Error('Failed to parse work experiences from CV');
     }
 
-    // Mock claim data for each work experience
-    const claims = workExperiences.map((exp) => ({
-      id: `claim_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      status: 'pending',
-      verifier: 'google',
-      createdAt: new Date().toISOString(),
-      verifiedAt: null,
-      workExperience: exp
-    }));
+    try {
+      console.log('Parsing work experiences for principal:', principal);
+      
+      // Register or update the user with their skill level
+      const skillLevel = workExperiences[0]?.title || 'Professional';
+      console.log('Registering/updating user with skill level:', skillLevel);
+      
+      await userService.registerUser(principal, 'User', skillLevel);
 
-    res.json({
-      success: true,
-      data: {
-        workExperiences,
-        claims
+      // Add each position to the user's profile
+      for (const exp of workExperiences) {
+        console.log('Adding position:', exp);
+        
+        // Calculate duration in months (approximate)
+        const startDate = exp.startDate ? new Date(exp.startDate) : new Date();
+        const endDate = exp.endDate ? new Date(exp.endDate) : new Date();
+        const durationMonths = exp.endDate 
+          ? (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24 * 30)
+          : 12; // Default to 1 year if no end date
+
+        await userService.addPosition(principal, {
+          company: exp.company,
+          role: exp.title,
+          duration: Math.max(1, Math.round(durationMonths)), // Ensure at least 1 month
+          verified: null,
+          reviewed: null,
+        });
       }
-    });
+
+      // Get the updated user profile
+      const userProfile = await userService.getUserProfile(principal);
+      console.log('Successfully updated user profile:', userProfile);
+
+      res.json({
+        success: true,
+        data: {
+          workExperiences,
+          userProfile
+        }
+      });
+    } catch (error) {
+      console.error('Error saving to user canister:', error);
+      throw new Error('Failed to save work experiences to user profile');
+    }
   } catch (error) {
     console.error('Error processing CV:', error);
     res.status(500).json({
@@ -102,7 +129,7 @@ const parseCvHandler: RequestHandler = async (req: Request, res: Response): Prom
   }
 };
 
-// Register the route
+// Register the route with no authentication for now
 cvRouter.post('/parse-cv', parseCvHandler);
 
 export default cvRouter;

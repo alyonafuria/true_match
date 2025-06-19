@@ -24,24 +24,57 @@ const allowedOrigins = [
   'http://localhost:3001',
   'http://localhost:9002', // Frontend development server
   'http://localhost:3000', // Next.js dev server
+  'http://localhost:8000', // Local IC replica
+  'https://identity.ic0.app', // Internet Identity canister
+  'https://identity.internetcomputer.org', // Internet Identity production
   // Add other allowed origins as needed
 ];
+
+// Log allowed origins for debugging
+console.log('Allowed CORS origins:', allowedOrigins);
 
 app.use(cors({
   origin: function(origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
+    if (!origin) {
+      console.log('Request with no origin - allowing');
+      return callback(null, true);
+    }
     
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+    // Check if origin is in the allowed list
+    const isAllowed = allowedOrigins.some(allowedOrigin => 
+      origin === allowedOrigin || 
+      origin.startsWith(allowedOrigin.replace('*', ''))
+    );
+
+    if (isAllowed) {
+      console.log(`Allowed CORS for origin: ${origin}`);
+      return callback(null, true);
+    } else {
+      console.log(`Blocked CORS for origin: ${origin}`);
+      const msg = `The CORS policy for this site does not allow access from the specified Origin (${origin}).`;
       return callback(new Error(msg), false);
     }
-    return callback(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'Referer',
+    'User-Agent'
+  ],
+  exposedHeaders: ['Content-Length', 'Content-Type'],
+  maxAge: 600, // 10 minutes
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
+
+// Handle preflight requests
+app.options('*', cors());
 
 // Middleware
 app.use(express.json());

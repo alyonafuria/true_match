@@ -4,33 +4,33 @@
       "candid": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did",
       "type": "custom",
       "wasm": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm.gz",
+      "specified_id": "rdmx6-jaaaa-aaaaa-aaadq-cai",
       "remote": {
         "id": {
           "ic": "rdmx6-jaaaa-aaaaa-aaadq-cai"
         }
       }
     },
-    "identity_canister": {
-      "main": "src/identity_canister/main.mo",
-      "type": "motoko"
-    },
-    "claims_canister": {
-      "main": "src/claims_canister/main.mo",
-      "type": "motoko"
-    },
-    "verifications_canister": {
-      "main": "src/verifications_canister/main.mo",
-      "type": "motoko"
-    },
-    "ii_app_backend": {
-      "main": "src/ii_app_backend/main.mo",
-      "type": "motoko"
+    "user": {
+      "main": "canisters/ii_app/src/user/user.mo",
+      "type": "motoko",
+      "specified_id": "lqy7q-dh777-77777-aaaaq-cai",
+      "declarations": {
+        "bindings": null,
+        "env_override": null,
+        "node_compatibility": false,
+        "output": "apps/frontend"
+      }
     }
   },
   "networks": {
     "ic": {
       "providers": ["https://ic0.app"],
       "type": "persistent"
+    },
+    "local": {
+      "bind": "127.0.0.1:8000",
+      "type": "ephemeral"
     }
   },
   "defaults": {

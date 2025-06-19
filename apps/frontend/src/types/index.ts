@@ -61,6 +61,7 @@ export interface UserProfile {
   headline?: string;
   summary?: string;
   cvUrl?: string;
+  profilePicture?: string;
   parsedInfo: ParsedInfo;
   skills: Array<{ name: string; verified?: boolean }>;
   verificationStatus: 'Verified' | 'Pending' | 'Rejected';

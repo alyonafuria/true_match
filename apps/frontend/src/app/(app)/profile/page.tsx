@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,19 @@ import { sampleUserProfile } from '@/lib/data';
 import type { UserProfile, ParsedExperience, ParsedEducation, WorkExperience } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from '@/components/ui/progress';
+import { createActor } from "@/declarations/user";
+import { canisterId } from '@/declarations/user/index.js';
+
+
+// Import Internet Computer dependencies
+import { Actor, HttpAgent } from '@dfinity/agent';
+import { AuthClient } from '@dfinity/auth-client';
+// Import the IDL factory from the generated declarations
+import { idlFactory } from '@/declarations/user/user.did';
+
+// User canister ID - replace with your actual canister ID
+const USER_CANISTER_ID = 'lqy7q-dh777-77777-aaaaq-cai'; // Replace with your canister ID
+const IC_HOST = process.env.NEXT_PUBLIC_IC_HOST || 'http://localhost:8000';
 
 export default function ProfilePage() {
   const [userProfile, setUserProfile] = useState<UserProfile>(sampleUserProfile);
@@ -20,7 +33,227 @@ export default function ProfilePage() {
   const [isParsing, setIsParsing] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [authClient, setAuthClient] = useState<any>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [principal, setPrincipal] = useState<string>('');
   const { toast } = useToast();
+
+  // Handle authentication callback
+  useEffect(() => {
+    const handleAuthCallback = async () => {
+      if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href);
+        const status = url.searchParams.get('status');
+        
+        if (status === 'success') {
+          const userParam = url.searchParams.get('user');
+          if (userParam) {
+            try {
+              const userData = JSON.parse(decodeURIComponent(userParam));
+              setUserProfile(prev => ({
+                ...prev,
+                name: userData.name || prev.name,
+                email: userData.email || prev.email,
+                profilePicture: userData.picture || prev.profilePicture
+              }));
+              
+              // Clean up the URL
+              window.history.replaceState({}, document.title, window.location.pathname);
+            } catch (error) {
+              console.error('Error parsing user data:', error);
+              toast({
+                title: 'Error',
+                description: 'Failed to parse user data',
+                variant: 'destructive'
+              });
+            }
+          }
+        }
+      }
+    };
+
+    handleAuthCallback();
+  }, [toast]);
+
+  // Initialize auth client on component mount
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        const client = await AuthClient.create({
+          idleOptions: {
+            idleTimeout: 1000 * 60 * 30, // 30 minutes
+            disableDefaultIdleCallback: true
+          }
+        });
+        setAuthClient(client);
+        const isAuthed = await client.isAuthenticated();
+        setIsAuthenticated(isAuthed);
+      } catch (error) {
+        console.error('Failed to initialize auth client:', error);
+      }
+    };
+    initAuth();
+  }, []);
+
+  // Function to handle login
+  const login = async (): Promise<void> => {
+    if (!authClient) {
+      const error = new Error('Auth client not initialized');
+      console.error(error);
+      throw error;
+    }
+    
+    try {
+      // First check if we're already authenticated
+      const isAuthed = await authClient.isAuthenticated();
+      if (isAuthed) {
+        const identity = authClient.getIdentity();
+        const principal = identity.getPrincipal().toString();
+        setIsAuthenticated(true);
+        setPrincipal(principal);
+        return;
+      }
+
+      // If not authenticated, start the login flow
+      return new Promise((resolve, reject) => {
+        authClient.login({
+          identityProvider: 'http://localhost:8000?canisterId=rdmx6-jaaaa-aaaaa-aaadq-cai',
+          maxTimeToLive: BigInt(7 * 24 * 60 * 60 * 1000 * 1000 * 1000), // 1 week in nanoseconds
+          onSuccess: async () => {
+            try {
+              const isAuthed = await authClient.isAuthenticated();
+              if (!isAuthed) {
+                throw new Error('Authentication verification failed');
+              }
+              const identity = authClient.getIdentity();
+              const principal = identity.getPrincipal().toString();
+              
+              setIsAuthenticated(true);
+              setPrincipal(principal);
+              
+              toast({
+                title: 'Successfully authenticated',
+                description: `Principal: ${principal}`,
+                variant: 'default'
+              });
+              
+              console.log('Login successful, principal:', principal);
+              resolve();
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+              console.error('Error in login success handler:', errorMessage);
+              toast({
+                title: 'Authentication error',
+                description: errorMessage,
+                variant: 'destructive'
+              });
+              reject(new Error(errorMessage));
+            }
+          },
+          onError: (error: Error) => {
+            console.error('Login error:', error.message);
+            toast({
+              title: 'Login failed',
+              description: error.message,
+              variant: 'destructive'
+            });
+            reject(error);
+          }
+        });
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Login failed:', errorMessage);
+      toast({
+        title: 'Authentication failed',
+        description: errorMessage,
+        variant: 'destructive'
+      });
+      throw error;
+    }
+  };
+
+  // Function to get the authenticated user actor
+  const getUserActor = async () => {
+    if (!authClient) {
+      throw new Error('Auth client not initialized');
+    }
+    
+    // Ensure we're authenticated
+    const isAuthed = await authClient.isAuthenticated();
+    if (!isAuthed) {
+      await login();
+      throw new Error('Please authenticate first');
+    }
+    
+    const identity = authClient.getIdentity();
+    return createActor(canisterId, {
+      agentOptions: {
+        identity
+      }
+    });
+
+    
+ 
+    
+    
+  };
+
+  // Function to save work experiences to the canister
+  const saveToCanister = async (experiences: WorkExperience[]) => {
+    
+    try {
+      // Get the authenticated actor
+      const actor = await getUserActor();
+      
+      // First register the user if not already registered
+      try {
+        await actor.registerUser('User', 'Professional');
+        console.log('User registered successfully');
+      } catch (error) {
+        // Ignore if user is already registered
+        console.log('User may already be registered');
+      }
+      
+      // Add each position to the canister
+      for (const exp of experiences) {
+        try {
+          const duration = exp.endDate && exp.startDate 
+            ? (new Date(exp.endDate).getTime() - new Date(exp.startDate).getTime()) / (1000 * 60 * 60 * 24 * 30) // Convert to months
+            : 12; // Default to 1 year if dates not available
+            
+          // Create the position object with exact fields expected by the canister
+          const position = {
+            company: exp.company,
+            role: exp.title,
+            duration: BigInt(Math.round(duration)),
+            verified: [],  // This will be converted to null in Motoko
+            reviewed: []   // This will be converted to null in Motoko
+          };
+          
+          // Log position details without trying to stringify BigInt directly
+          console.log('Sending position to canister:', {
+            company: position.company,
+            role: position.role,
+            duration: position.duration.toString(), // Convert BigInt to string for logging
+            verified: position.verified,
+            reviewed: position.reviewed
+          });
+          
+          await actor.addPosition(position);
+          console.log('Position added successfully');
+        } catch (error) {
+          console.error(`Error adding position for ${exp.company}:`, error);
+          // Continue with next position even if one fails
+        }
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error in saveToCanister:', error);
+      throw new Error(`Failed to save to canister: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
 
   const handleInputChange = (field: keyof UserProfile, value: any) => {
     setUserProfile(prev => ({ ...prev, [field]: value }));
@@ -59,69 +292,139 @@ export default function ProfilePage() {
     setIsParsing(true);
     
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
-      console.log('Sending request to:', `${backendUrl}/api/parse-cv`);
-      
-      const response = await fetch(`${backendUrl}/api/parse-cv`, {
+      // Call OpenAI API directly from the frontend
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
-        mode: 'cors',
-        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_OPENAI_API_KEY}`
         },
-        body: JSON.stringify({ text: cvText }),
+        body: JSON.stringify({
+          model: 'gpt-3.5-turbo',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a helpful assistant that extracts work experience from CV text in JSON format.'
+            },
+            {
+              role: 'user',
+              content: `Extract work experience from this CV text and return a JSON array with the following structure for each job:
+              [
+                {
+                  "title": "Job Title",
+                  "company": "Company Name",
+                  "startDate": "YYYY-MM-DD or YYYY",
+                  "endDate": "YYYY-MM-DD or YYYY or null if current",
+                  "description": "Brief description of role"
+                }
+              ]
+              
+              CV text: ${cvText}
+              
+              Only return valid JSON, no other text.`
+            }
+          ]
+        })
       });
       
-      console.log('Response status:', response.status);
-      
       if (!response.ok) {
-        let errorMessage = 'Failed to parse CV';
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorMessage;
-        } catch (e) {
-          // If we can't parse the error as JSON, use the status text
-          errorMessage = response.statusText || errorMessage;
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || 'Failed to parse CV with OpenAI');
+      }
+      
+      const data = await response.json();
+      const content = data.choices[0]?.message?.content;
+      
+      if (!content) {
+        throw new Error('No content in OpenAI response');
+      }
+      
+      // Clean the response to remove markdown code blocks if present
+      let jsonContent = content.trim();
+      if (jsonContent.startsWith('```json')) {
+        // Remove the opening ```json and closing ```
+        jsonContent = jsonContent
+          .replace(/^```json\n?/m, '')  // Remove opening ```json
+          .replace(/```$/, '')          // Remove closing ```
+          .trim();
+      } else if (jsonContent.startsWith('```')) {
+        // Handle case where it's just ``` without json
+        jsonContent = jsonContent
+          .replace(/^```\n?/m, '')     // Remove opening ```
+          .replace(/```$/, '')          // Remove closing ```
+          .trim();
+      }
+      
+      // Parse the JSON response
+      const workExperiences = JSON.parse(jsonContent);
+      
+      if (!Array.isArray(workExperiences)) {
+        throw new Error('Invalid format returned from OpenAI: Expected an array of work experiences');
+      }
+      
+      if (workExperiences.length === 0) {
+        throw new Error('No work experiences found in the CV');
+      }
+      
+      // Update the UI with parsed experiences
+      const parsedExperiences: ParsedExperience[] = workExperiences.map((exp: any) => ({
+        id: `exp-${Math.random().toString(36).substr(2, 9)}`,
+        title: exp.title,
+        company: exp.company,
+        dates: `${exp.startDate} - ${exp.endDate || 'Present'}`,
+        description: exp.description || '',
+        verified: false,
+        verifiedBy: '',
+        startDate: exp.startDate,
+        endDate: exp.endDate || 'Present'
+      }));
+      
+      setUserProfile(prev => ({
+        ...prev,
+        parsedInfo: {
+          ...prev.parsedInfo,
+          experience: parsedExperiences
         }
-        throw new Error(errorMessage);
-      }
+      }));
       
-      const responseData = await response.json();
-      console.log('Response data:', responseData);
+      // Save to the canister
+      await saveToCanister(workExperiences);
       
-      if (!responseData.data) {
-        throw new Error('Invalid response format from server');
-      }
+      setWorkExperiences(workExperiences);
       
-      const { workExperiences } = responseData.data || {};
-      
-      if (workExperiences && workExperiences.length > 0) {
-        setWorkExperiences(workExperiences);
-        toast({
-          title: "CV Processed",
-          description: `Found ${workExperiences.length} work experience(s)`,
-        });
-      } else {
-        toast({
-          title: "No Work Experience Found",
-          description: "We couldn't find any work experience in your CV.",
-          variant: "default"
-        });
-      }
+      toast({
+        title: "CV Processed Successfully",
+        description: `Saved ${workExperiences.length} work experience(s) to the blockchain`,
+        variant: "default"
+      });
       
     } catch (error) {
       console.error('Error processing CV:', error);
-      toast({
-        title: "Processing failed",
-        description: error instanceof Error ? error.message : 'Failed to process CV',
-        variant: "destructive"
-      });
+      
+      // Check if it's an authentication error
+      if (error instanceof Error && error.message.includes('authenticate')) {
+        toast({
+          title: "Authentication Required",
+          description: "Please sign in with Internet Identity to save your CV data.",
+          variant: "default",
+          action: (
+            <Button variant="outline" onClick={login}>
+              Sign In
+            </Button>
+          )
+        });
+      } else {
+        toast({
+          title: "Processing failed",
+          description: error instanceof Error ? error.message : 'Failed to process CV',
+          variant: "destructive"
+        });
+      }
     } finally {
       setIsParsing(false);
     }
   };
-  
+
   const handleSaveProfile = () => {
     setIsLoading(true);
     // Simulate API call

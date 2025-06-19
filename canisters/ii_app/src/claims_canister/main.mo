@@ -162,9 +162,4 @@ actor {
       };
     }
   };
-
-  // For testing: simulate verification result
-  public shared ({ caller }) func simulateVerification(claimId : Text, verified : Bool) : async ?Claim {
-    await completeVerification(claimId, verified);
-  };
 }
