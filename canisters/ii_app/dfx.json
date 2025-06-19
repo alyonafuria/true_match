@@ -2,14 +2,13 @@
   "canisters": {
     "internet_identity": {
       "candid": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity.did",
-      "frontend": {},
+      "type": "custom",
+      "wasm": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm.gz",
       "remote": {
         "id": {
           "ic": "rdmx6-jaaaa-aaaaa-aaadq-cai"
         }
-      },
-      "type": "custom",
-      "wasm": "https://github.com/dfinity/internet-identity/releases/latest/download/internet_identity_dev.wasm.gz"
+      }
     },
     "identity_canister": {
       "main": "src/identity_canister/main.mo",
@@ -26,6 +25,12 @@
     "ii_app_backend": {
       "main": "src/ii_app_backend/main.mo",
       "type": "motoko"
+    }
+  },
+  "networks": {
+    "ic": {
+      "providers": ["https://ic0.app"],
+      "type": "persistent"
     }
   },
   "defaults": {

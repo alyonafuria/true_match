@@ -2,7 +2,6 @@ import Principal "mo:base/Principal";
 import Array "mo:base/Array";
 import Text "mo:base/Text";
 import Time "mo:base/Time";
-import UUID "mo:uuid/async/UUID";
 
 actor {
   public type ClaimStatus = {
@@ -77,11 +76,11 @@ actor {
   // Start the verification process (simulated)
   private func startVerificationProcess(claimId : Text, owner : Principal) : async () {
     // Simulate verification delay (5 seconds)
-    await* async {
+    await async {
       ignore await Timer.setTimer(#seconds 5);
       
       // Update claim status to pending (verification in progress)
-      await updateClaimStatus(claimId, owner, #pending);
+      ignore await updateClaimStatus(claimId, owner, #pending);
     };
   };
 
