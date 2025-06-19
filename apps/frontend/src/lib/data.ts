@@ -85,11 +85,28 @@ export const sampleUserProfile: UserProfile = {
   parsedInfo: {
     contact: 'alex.johnson@example.com | (555) 123-4567',
     experience: [
-      { title: 'Software Engineer', company: 'Tech Solutions Inc.', dates: '2021-Present', description: 'Developed and maintained key features for a flagship SaaS product.', verified: true },
-      { title: 'Junior Developer', company: 'Web Wizards LLC', dates: '2019-2021', description: 'Assisted in developing client websites and internal tools.', verified: true },
+      { 
+        title: 'Senior Full Stack Developer', 
+        company: 'Tech Innovations Inc.', 
+        dates: '2020-Present', 
+        description: 'Led development of multiple React/Node.js applications', 
+        verified: true 
+      },
+      { 
+        title: 'Web Developer', 
+        company: 'Digital Solutions LLC', 
+        dates: '2018-2020', 
+        description: 'Developed and maintained client websites using modern web technologies', 
+        verified: true 
+      },
     ],
     education: [
-      { degree: 'B.S. Computer Science', institution: 'State University', dates: '2015-2019', verified: true },
+      { 
+        degree: 'B.S. Computer Science', 
+        institution: 'State University', 
+        dates: '2015-2019', 
+        verified: true 
+      },
     ],
   },
   skills: [

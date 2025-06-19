@@ -9,13 +9,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { UploadCloud, CheckCircle, AlertCircle, Edit3, Save, Briefcase, GraduationCap, Award } from 'lucide-react';
 import { sampleUserProfile } from '@/lib/data';
-import type { UserProfile } from '@/types';
+import type { UserProfile, ParsedExperience, ParsedEducation, WorkExperience } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from '@/components/ui/progress';
 
 export default function ProfilePage() {
   const [userProfile, setUserProfile] = useState<UserProfile>(sampleUserProfile);
-  const [cvFile, setCvFile] = useState<File | null>(null);
+  const [cvText, setCvText] = useState('');
+  const [workExperiences, setWorkExperiences] = useState<WorkExperience[]>([]);
+  const [isParsing, setIsParsing] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
@@ -24,15 +26,16 @@ export default function ProfilePage() {
     setUserProfile(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleParsedInfoChange = (section: 'experience' | 'education', index: number, field: string, value: string) => {
-    setUserProfile(prev => {
-      const newProfile = { ...prev };
-      if (newProfile.parsedInfo && newProfile.parsedInfo[section]) {
-        // @ts-ignore
-        newProfile.parsedInfo[section][index][field] = value;
+  const handleParsedInfoChange = (section: 'experience' | 'education', index: number, field: keyof ParsedExperience | keyof ParsedEducation, value: string) => {
+    setUserProfile(prev => ({
+      ...prev,
+      parsedInfo: {
+        ...prev.parsedInfo,
+        [section]: prev.parsedInfo[section].map((item, i) => 
+          i === index ? { ...item, [field]: value } : item
+        )
       }
-      return newProfile;
-    });
+    }));
   };
   
   const handleSkillChange = (index: number, value: string) => {
@@ -43,18 +46,79 @@ export default function ProfilePage() {
     });
   };
 
-  const handleCvUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      setCvFile(event.target.files[0]);
-      // Simulate CV parsing
-      setIsLoading(true);
-      setTimeout(() => {
-        toast({ title: "CV Uploaded", description: "CV parsing initiated. Information will appear shortly." });
-        // In a real app, you'd parse the CV and update userProfile.parsedInfo
-        // For now, we just acknowledge the upload
-        setUserProfile(prev => ({...prev, cvUrl: event.target.files![0].name, verificationStatus: 'Pending'})); // Update verification status to pending
-        setIsLoading(false);
-      }, 2000);
+  const handleCvSubmit = async () => {
+    if (!cvText.trim()) {
+      toast({
+        title: "No CV text",
+        description: "Please paste your CV text before submitting.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    setIsParsing(true);
+    
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      console.log('Sending request to:', `${backendUrl}/api/parse-cv`);
+      
+      const response = await fetch(`${backendUrl}/api/parse-cv`, {
+        method: 'POST',
+        mode: 'cors',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({ text: cvText }),
+      });
+      
+      console.log('Response status:', response.status);
+      
+      if (!response.ok) {
+        let errorMessage = 'Failed to parse CV';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (e) {
+          // If we can't parse the error as JSON, use the status text
+          errorMessage = response.statusText || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+      
+      const responseData = await response.json();
+      console.log('Response data:', responseData);
+      
+      if (!responseData.data) {
+        throw new Error('Invalid response format from server');
+      }
+      
+      const { workExperiences } = responseData.data || {};
+      
+      if (workExperiences && workExperiences.length > 0) {
+        setWorkExperiences(workExperiences);
+        toast({
+          title: "CV Processed",
+          description: `Found ${workExperiences.length} work experience(s)`,
+        });
+      } else {
+        toast({
+          title: "No Work Experience Found",
+          description: "We couldn't find any work experience in your CV.",
+          variant: "default"
+        });
+      }
+      
+    } catch (error) {
+      console.error('Error processing CV:', error);
+      toast({
+        title: "Processing failed",
+        description: error instanceof Error ? error.message : 'Failed to process CV',
+        variant: "destructive"
+      });
+    } finally {
+      setIsParsing(false);
     }
   };
   
@@ -74,9 +138,9 @@ export default function ProfilePage() {
   let profileCompletion = 0;
   if (userProfile.headline) profileCompletion += 20;
   if (userProfile.summary) profileCompletion += 20;
-  if (userProfile.parsedInfo?.experience?.length > 0) profileCompletion += 20;
-  if (userProfile.parsedInfo?.education?.length > 0) profileCompletion += 20;
-  if (userProfile.skills?.length > 0) profileCompletion += 20;
+  if (userProfile.parsedInfo.experience.length > 0) profileCompletion += 20;
+  if (userProfile.parsedInfo.education.length > 0) profileCompletion += 20;
+  if (userProfile.skills.length > 0) profileCompletion += 20;
 
 
   return (
@@ -117,17 +181,73 @@ export default function ProfilePage() {
           <CardDescription>Upload your CV to automatically parse information and kickstart verification.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
-            <Label htmlFor="cv-upload">Upload CV (PDF, DOCX)</Label>
-            <div className="flex items-center space-x-2">
-                <Input id="cv-upload" type="file" accept=".pdf,.doc,.docx" onChange={handleCvUpload} className="max-w-sm" disabled={isLoading}/>
-                <Button variant="outline" onClick={() => document.getElementById('cv-upload')?.click()} disabled={isLoading} className="hover:bg-accent/10 active:scale-95 transition-all">
-                    <UploadCloud className="mr-2 h-4 w-4" /> {cvFile ? "Replace CV" : "Upload CV"}
-                </Button>
-            </div>
-            {cvFile && <p className="text-sm text-muted-foreground">Selected file: {cvFile.name}</p>}
-            {userProfile.cvUrl && !cvFile && <p className="text-sm text-muted-foreground">Current CV: {userProfile.cvUrl}</p>}
-            {isLoading && <p className="text-sm text-primary">Processing CV...</p>}
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="cv-text">Paste your CV text here</Label>
+                  <Textarea
+                    id="cv-text"
+                    value={cvText}
+                    onChange={(e) => setCvText(e.target.value)}
+                    placeholder="Paste your CV content here..."
+                    className="min-h-[200px] mt-2"
+                    disabled={isParsing}
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <Button 
+                    onClick={handleCvSubmit} 
+                    disabled={isParsing || !cvText.trim()}
+                    className="hover:opacity-90 active:scale-95 transition-all"
+                  >
+                    {isParsing ? 'Processing...' : 'Parse CV'}
+                  </Button>
+                </div>
+                
+                {workExperiences.length > 0 && (
+                  <div className="mt-6 space-y-4">
+                    <h3 className="text-lg font-medium">Extracted Work Experience</h3>
+                    <div className="space-y-4">
+                      {workExperiences.map((exp, index) => (
+                        <div key={index} className="p-4 border rounded-lg">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h4 className="font-medium">{exp.title}</h4>
+                              <p className="text-sm text-muted-foreground">{exp.company}</p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {exp.startDate} - {exp.endDate || 'Present'}
+                              </p>
+                            </div>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => {
+                                // Add to profile or create claim
+                                toast({
+                                  title: "Claim Created",
+                                  description: `Claim created for ${exp.title} at ${exp.company}`,
+                                });
+                              }}
+                            >
+                              Create Claim
+                            </Button>
+                          </div>
+                          {exp.description && (
+                            <p className="mt-2 text-sm text-muted-foreground">
+                              {exp.description}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {isParsing && (
+                  <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                    <div className="h-4 w-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    <span>Parsing your CV...</span>
+                  </div>
+                )}
           </div>
         </CardContent>
       </Card>

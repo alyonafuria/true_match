@@ -11,11 +11,18 @@ const router = Router();
 const CLIENT_ID = process.env.LINKEDIN_CLIENT_ID;
 const CLIENT_SECRET = process.env.LINKEDIN_CLIENT_SECRET;
 const REDIRECT_URI = process.env.LINKEDIN_REDIRECT_URI;
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:9002';
 
 if (!CLIENT_ID || !CLIENT_SECRET || !REDIRECT_URI) {
   console.error('Missing required LinkedIn OAuth environment variables');
   process.exit(1);
 }
+
+console.log('Auth service starting with config:', {
+  CLIENT_ID: CLIENT_ID ? '***' : 'missing',
+  REDIRECT_URI,
+  FRONTEND_URL
+});
 
 // Start OAuth flow - redirect to LinkedIn
 router.get('/linkedin', (_req: Request, res: Response): void => {
@@ -90,22 +97,27 @@ router.get('/linkedin/callback', async (req: Request, res: Response): Promise<vo
     // 3. Format user data from LinkedIn response
     const userInfo = {
       id: userData.sub,
+      sub: userData.sub, // Include both id and sub for compatibility
       name: userData.name || `${userData.given_name || ''} ${userData.family_name || ''}`.trim() || null,
       email: userData.email,
       picture: userData.picture
-    };
+    } as const;
     
     console.log('Sending user data to frontend:', userInfo);
     
     // 4. Redirect back to frontend with success and user data
-    const frontendUrl = new URL('http://localhost:9002/auth/callback');
-    frontendUrl.searchParams.append('status', 'success');
-    // Encode the user data to safely include it in the URL
-    const encodedUserData = encodeURIComponent(JSON.stringify(userInfo));
-    frontendUrl.searchParams.append('user', encodedUserData);
+    const frontendCallbackUrl = new URL(`${FRONTEND_URL}/auth/callback`);
+    frontendCallbackUrl.searchParams.append('status', 'success');
     
-    console.log('Redirecting to frontend with URL:', frontendUrl.toString());
-    res.redirect(frontendUrl.toString());
+    // Encode the user data to safely include it in the URL
+    const encodedUserData = encodeURIComponent(JSON.stringify({
+      ...userInfo,
+      id: userInfo.sub // Ensure we have both id and sub for compatibility
+    }));
+    frontendCallbackUrl.searchParams.append('user', encodedUserData);
+    
+    console.log('Redirecting to frontend with URL:', frontendCallbackUrl.toString());
+    res.redirect(frontendCallbackUrl.toString());
 
   } catch (error: any) {
     console.error('Auth error:', {

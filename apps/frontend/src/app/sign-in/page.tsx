@@ -20,8 +20,10 @@ export default function SignInPage() {
 
   const handleLinkedInLogin = () => {
     setIsLoading(true);
-    // This will be handled by the backend
-    window.location.href = 'http://localhost:3001/auth/linkedin';
+    // Use the environment variable for the OAuth URL
+    const oauthUrl = process.env.NEXT_PUBLIC_LINKEDIN_OAUTH_URL || 'http://localhost:3001/auth/linkedin';
+    console.log('Initiating LinkedIn OAuth flow to:', oauthUrl);
+    window.location.href = oauthUrl;
   };
 
   const handleSignIn = (e: React.FormEvent) => {

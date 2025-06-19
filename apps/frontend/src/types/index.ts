@@ -25,6 +25,35 @@ export interface Application {
   fitPercentage: number;
 }
 
+export interface ParsedExperience {
+  title: string;
+  company: string;
+  dates: string;
+  description?: string;
+  verified?: boolean;
+}
+
+export interface ParsedEducation {
+  degree: string;
+  institution: string;
+  dates: string;
+  verified?: boolean;
+}
+
+export interface ParsedInfo {
+  contact: string;
+  experience: ParsedExperience[];
+  education: ParsedEducation[];
+}
+
+export interface WorkExperience {
+  title: string;
+  company: string;
+  startDate: string;
+  endDate: string | null;
+  description?: string;
+}
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -32,11 +61,7 @@ export interface UserProfile {
   headline?: string;
   summary?: string;
   cvUrl?: string;
-  parsedInfo?: {
-    contact: string;
-    experience: Array<{ title: string; company: string; dates: string; description?: string; verified?: boolean }>;
-    education: Array<{ degree: string; institution: string; dates: string; verified?: boolean }>;
-  };
+  parsedInfo: ParsedInfo;
   skills: Array<{ name: string; verified?: boolean }>;
   verificationStatus: 'Verified' | 'Pending' | 'Rejected';
 }

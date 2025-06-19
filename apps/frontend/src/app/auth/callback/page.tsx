@@ -1,11 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useToast } from '@/hooks/use-toast';
 import { useUserRole } from '@/contexts/UserRoleContext';
 import { loginWithII } from '@/lib/ii';
-import type { LinkedInUser } from '@/types/auth';
+
+interface UserData {
+  id: string;
+  email: string;
+  name?: string;
+  sub?: string;
+}
 
 export default function AuthCallback() {
   const router = useRouter();
@@ -14,121 +20,118 @@ export default function AuthCallback() {
   const { setRole } = useUserRole();
   const [isIIConnecting, setIsIIConnecting] = useState(false);
 
-  useEffect(() => {
-    const handleAuth = async () => {
-      console.log('Auth callback received params:', searchParams.toString());
+  const handleIILogin = useCallback(async (user: UserData) => {
+    try {
+      setIsIIConnecting(true);
       
-      const status = searchParams.get('status');
+      // Show loading message for II login
+      toast({
+        title: 'Connecting to Internet Identity...',
+        description: 'Please complete the Internet Identity authentication',
+      });
       
-      if (status === 'success') {
-        const userParam = searchParams.get('user');
-        if (userParam) {
-          try {
-            const user = JSON.parse(decodeURIComponent(userParam)) as LinkedInUser;
-            console.log('Parsed user data:', user);
-            
-            if (!user.email || !user.id) {
-              throw new Error('Missing required user data');
-            }
-            
-            // Store user data in localStorage
-            localStorage.setItem('userEmail', user.email);
-            if (user.name) {
-              localStorage.setItem('userName', user.name);
-            }
-            
-            // Store complete user data
-            localStorage.setItem('user', JSON.stringify(user));
-            
-            console.log('User data stored, initiating II login...');
-            
-            // Show loading message
-            toast({
-              title: 'Connecting to Internet Identity...',
-              description: 'Please complete the Internet Identity authentication',
-            });
-            
-            // Set loading state
-            setIsIIConnecting(true);
-            
-            // Start II login flow
-            try {
-              await loginWithII(
-                (principal) => {
-                  console.log('II login successful with principal:', principal);
-                  
-                  // Store the II principal in localStorage
-                  if (typeof window !== 'undefined') {
-                    localStorage.setItem('iiPrincipal', principal);
-                    console.log('Stored II principal in localStorage');
-                  }
-                  
-                  // Set user role after successful II login
-                  setRole('job_seeker');
-                  
-                  // Show success message
-                  toast({
-                    title: 'Successfully signed in',
-                    description: `Welcome, ${user.email || 'User'}!`,
-                  });
-                  
-                  // Redirect to dashboard
-                  router.push('/dashboard');
-                },
-                { id: user.id, email: user.email }
-              );
-            } catch (error) {
-              console.error('II login failed:', error);
-              toast({
-                title: 'Authentication Error',
-                description: 'Failed to connect with Internet Identity. Please try again.',
-                variant: 'destructive',
-              });
-              router.push('/sign-in');
-            } finally {
-              setIsIIConnecting(false);
-            }
-            
-          } catch (error) {
-            console.error('Error handling authentication:', error);
-            toast({
-              title: 'Authentication Error',
-              description: 'There was an error processing your login. Please try again.',
-              variant: 'destructive',
-            });
-            router.push('/sign-in');
+      await loginWithII(
+        (principal) => {
+          console.log('II login successful with principal:', principal);
+          
+          // Store the II principal in localStorage
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('iiPrincipal', principal);
+            console.log('Stored II principal in localStorage');
           }
-        } else {
-          console.error('No user data in callback');
+          
+          // Set user role after successful II login
+          setRole('job_seeker');
+          
+          // Show success message
           toast({
-            title: 'Authentication Error',
-            description: 'No user data received. Please try logging in again.',
-            variant: 'destructive',
+            title: 'Successfully signed in',
+            description: `Welcome, ${user.email || 'User'}!`,
           });
-          router.push('/sign-in');
+          
+          // Redirect to dashboard
+          router.push('/dashboard');
+        },
+        { id: user.id, email: user.email }
+      );
+    } catch (error) {
+      console.error('II login failed:', error);
+      toast({
+        title: 'Authentication Error',
+        description: 'Failed to connect with Internet Identity. Please try again.',
+        variant: 'destructive',
+      });
+      router.push('/sign-in');
+    } finally {
+      setIsIIConnecting(false);
+    }
+  }, [router, setRole, toast]);
+
+  useEffect(() => {
+    const processAuth = async () => {
+      try {
+        const status = searchParams.get('status');
+        
+        if (status !== 'success') {
+          throw new Error('Authentication failed: Invalid status');
         }
-      } else if (status === 'error') {
-        const error = searchParams.get('error');
-        const errorDescription = searchParams.get('error_description');
+
+        const userParam = searchParams.get('user');
+        if (!userParam) {
+          throw new Error('Authentication failed: No user data');
+        }
+
+        // Decode and parse user data
+        const user = JSON.parse(decodeURIComponent(userParam)) as UserData;
+        console.log('Parsed user data:', user);
         
-        console.error('Auth error:', { error, errorDescription });
+        if (!user.email || !(user.id || user.sub)) {
+          throw new Error('Authentication failed: Missing required user data');
+        }
         
+        // Use sub as id if id is not present
+        const userId = user.id || user.sub || '';
+        if (!userId) {
+          throw new Error('Authentication failed: No user ID found');
+        }
+        
+        // Store user data in localStorage
+        localStorage.setItem('userEmail', user.email);
+        if (user.name) {
+          localStorage.setItem('userName', user.name);
+        }
+        
+        // Store complete user data with consistent id
+        const userData = { ...user, id: userId };
+        localStorage.setItem('user', JSON.stringify(userData));
+        
+        console.log('User data stored, checking for existing II principal...');
+        
+        // Check if we already have an II principal for this user
+        const storedPrincipal = localStorage.getItem('iiPrincipal');
+        if (storedPrincipal) {
+          console.log('Found existing II principal, proceeding to dashboard');
+          setRole('job_seeker');
+          router.push('/dashboard');
+          return;
+        }
+        
+        // Start II login flow
+        await handleIILogin({ ...userData, id: userId });
+        
+      } catch (error) {
+        console.error('Authentication error:', error);
         toast({
-          title: 'Sign in failed',
-          description: errorDescription || 'An error occurred during sign in',
+          title: 'Authentication Error',
+          description: error instanceof Error ? error.message : 'An unknown error occurred',
           variant: 'destructive',
         });
-        
-        router.push('/sign-in');
-      } else {
-        console.error('No status in callback, redirecting to sign-in');
-        // No status or unknown status, redirect to sign in
         router.push('/sign-in');
       }
     };
 
-    handleAuth();
-  }, [searchParams, router, setRole, toast]);
+    processAuth();
+  }, [searchParams, router, toast, setRole, handleIILogin]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4">
