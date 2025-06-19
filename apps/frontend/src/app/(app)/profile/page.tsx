@@ -12,8 +12,8 @@ import { sampleUserProfile } from '@/lib/data';
 import type { UserProfile, ParsedExperience, ParsedEducation, WorkExperience } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from '@/components/ui/progress';
-import { createActor } from "@/declarations/user";
-import { canisterId } from '@/declarations/user/index.js';
+// import { createActor } from "@/declarations/user";
+// import { canisterId } from '@/declarations/user/index.js';
 
 
 // Import Internet Computer dependencies

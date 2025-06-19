@@ -4,6 +4,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle, Briefcase, ShieldCheck, Users } from 'lucide-react';
 import Image from 'next/image';
 
+// Import images using @/ alias
+const hiringGateway = '/assets/20250619_0233_Futuristic_Hiring_Gateway_simple_compose_01jy2p58.png';
+const createProfile = '/assets/20250619_0149_Create_Profile_Illustration_simple_compose_01jy2k.png';
+const verification = '/assets/20250619_0153_3D_Verification_Icons_remix_01jy2kvmvjecmrefc41syp3wct.png';
+const aiMatching = '/assets/20250619_0158_AI_Job_Connection_simple_compose_01jy2m66m9enwbptxah9esdqxr.png';
+
 export default function LandingPage() {
   const features = [
     {
@@ -54,13 +60,13 @@ export default function LandingPage() {
             <Button size="lg" asChild className="hover:opacity-80 active:scale-95 transition-all animate-fadeIn" style={{ animationDelay: '0.4s' }}>
               <Link href="/sign-in">Get Started</Link>
             </Button>
-             <div className="mt-12 relative aspect-video max-w-4xl mx-auto rounded-lg shadow-2xl overflow-hidden animate-fadeIn" style={{ animationDelay: '0.6s' }}>
+             <div className="mt-12 relative w-full max-w-4xl mx-auto rounded-lg shadow-2xl overflow-hidden animate-fadeIn aspect-[16/9]" style={{ animationDelay: '0.6s' }}>
                 <Image 
-                    src="https://placehold.co/1200x675.png" 
-                    alt="Platform dashboard preview" 
-                    layout="fill"
-                    objectFit="cover"
-                    data-ai-hint="dashboard hiring"
+                    src={hiringGateway}
+                    alt="Futuristic Hiring Gateway"
+                    fill
+                    sizes="(max-width: 1200px) 100vw, 1200px"
+                    className="object-cover w-full h-full"
                     priority
                 />
             </div>
@@ -100,19 +106,43 @@ export default function LandingPage() {
                 <div className="bg-primary text-primary-foreground rounded-full p-4 mb-4 text-2xl font-bold w-12 h-12 flex items-center justify-center">1</div>
                 <h3 className="text-xl font-semibold mb-2 font-headline">Create Your Profile</h3>
                 <p className="text-muted-foreground">Job seekers upload CVs, employers post jobs. Get started in minutes.</p>
-                <Image src="https://placehold.co/300x200.png" alt="Profile creation" width={300} height={200} className="mt-4 rounded-lg shadow-md" data-ai-hint="profile creation"/>
+                <div className="relative w-full aspect-[4/3] mt-4 rounded-lg overflow-hidden shadow-md">
+                  <Image 
+                    src={createProfile} 
+                    alt="Profile creation"
+                    fill
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                    className="object-cover w-full h-full"
+                  />
+                </div>
               </div>
               <div className="flex flex-col items-center text-center p-6 animate-fadeIn" style={{ animationDelay: '0.3s' }}>
                 <div className="bg-primary text-primary-foreground rounded-full p-4 mb-4 text-2xl font-bold w-12 h-12 flex items-center justify-center">2</div>
                 <h3 className="text-xl font-semibold mb-2 font-headline">Verify & Validate</h3>
                 <p className="text-muted-foreground">Our platform and verifiers confirm credentials, ensuring authenticity and trust.</p>
-                 <Image src="https://placehold.co/300x200.png" alt="Verification process" width={300} height={200} className="mt-4 rounded-lg shadow-md" data-ai-hint="verification process"/>
+                <div className="relative w-full aspect-[4/3] mt-4 rounded-lg overflow-hidden shadow-md">
+                  <Image 
+                    src={verification} 
+                    alt="Verification process"
+                    fill
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                    className="object-cover w-full h-full"
+                  />
+                </div>
               </div>
               <div className="flex flex-col items-center text-center p-6 animate-fadeIn" style={{ animationDelay: '0.5s' }}>
                 <div className="bg-primary text-primary-foreground rounded-full p-4 mb-4 text-2xl font-bold w-12 h-12 flex items-center justify-center">3</div>
                 <h3 className="text-xl font-semibold mb-2 font-headline">Match & Connect</h3>
                 <p className="text-muted-foreground">AI finds the best fits. Connect, apply, and hire with confidence.</p>
-                 <Image src="https://placehold.co/300x200.png" alt="Job matching" width={300} height={200} className="mt-4 rounded-lg shadow-md" data-ai-hint="job matching"/>
+                <div className="relative w-full aspect-[4/3] mt-4 rounded-lg overflow-hidden shadow-md">
+                  <Image 
+                    src={aiMatching} 
+                    alt="AI Job Matching"
+                    fill
+                    sizes="(max-width: 768px) 100vw, 50vw"
+                    className="object-cover w-full h-full"
+                  />
+                </div>
               </div>
             </div>
           </div>
