@@ -1,4 +1,7 @@
-import type { IIUser } from '@/types/auth';
+interface IIUser {
+  id: string;
+  email: string;
+}
 
 export declare function loginWithII(
   onPrincipal: (principal: string) => void,
