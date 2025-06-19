@@ -35,30 +35,30 @@ const parseCvHandler: RequestHandler = async (req: Request, res: Response): Prom
       return;
     }
 
-    // Call OpenAI to parse the CV text
+    // Call OpenAI to parse the CV text using the cost-effective GPT-4.1 nano model
+    const prompt = `Extract work experience from this CV text and return a JSON array with the following structure for each job:
+    [
+      {
+        "title": "Job Title",
+        "company": "Company Name",
+        "startDate": "YYYY-MM-DD or YYYY",
+        "endDate": "YYYY-MM-DD or YYYY or null if current",
+        "description": "Brief description of role"
+      }
+    ]
+    
+    CV text: ${text}
+    
+    Only return valid JSON, no other text.`;
+
     const completion = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
+      model: 'gpt-4.1-nano',
       messages: [
-        {
-          role: 'system',
-          content: `You are a helpful assistant that extracts work experience from CV text. 
-          Return a JSON array of work experiences with the following structure for each:
-          {
-            "title": "Job Title",
-            "company": "Company Name",
-            "startDate": "YYYY-MM-DD or YYYY",
-            "endDate": "YYYY-MM-DD or YYYY or null if current",
-            "description": "Brief description of role"
-          }
-          
-          Only return valid JSON, no other text.`
-        },
-        {
-          role: 'user',
-          content: `Extract work experience from this CV text: ${text}`
-        }
+        { role: 'system', content: 'You are a helpful assistant that extracts work experience from CV text in JSON format.' },
+        { role: 'user', content: prompt }
       ],
-      temperature: 0.3,
+      max_tokens: 1000,
+      temperature: 0.2,
     });
 
     const content = completion.choices[0]?.message?.content;
